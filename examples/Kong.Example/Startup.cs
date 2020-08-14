@@ -2,6 +2,7 @@
 using Kong.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,27 +23,29 @@ namespace Kong.Example
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddSingleton<KongClient>(fat =>
+            services.AddKong(() =>
             {
                 var options = new KongClientOptions(HttpClientFactory.Create(), this.Configuration["kong:host"]);
-                var client = new KongClient(options);
-                return client;
+                return options;
             });
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env, KongClient kongClient)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, KongClient kongClient)
         {
-            //app.UseKong(Configuration, kongClient);
             UseKong(app, kongClient);
 
-            if (env.IsDevelopment())
+            if (env.EnvironmentName == Microsoft.Extensions.Hosting.Environments.Development)
             {
                 app.UseDeveloperExceptionPage();
             }
 
-            app.UseMvc();
+            app.UseRouting()
+                  .UseEndpoints(endpoints =>
+                  {
+                      endpoints.MapDefaultControllerRoute();
+                  });
         }
 
         public void UseKong(IApplicationBuilder app, KongClient kongClient)
@@ -51,7 +54,16 @@ namespace Kong.Example
             var target = Configuration.GetSection("kong:target").Get<TargetInfo>();
             var uri = new Uri(Configuration["server.urls"]);
             target.Target = uri.Authority;
-            app.UseKong(kongClient, upStream, target);
+            app.UseKong(kongClient, upStream, target, OnExecuter);
+        }
+
+        /// <summary>
+        /// Custom HealthChecks
+        /// </summary>
+        /// <param name="context"></param>
+        public void OnExecuter(HttpContext context)
+        {
+            context.Response.StatusCode = 200;
         }
     }
 }

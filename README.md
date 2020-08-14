@@ -3,7 +3,7 @@
 
 ## How to start
 
-Don't talk anying,Just do it!(别说话，就是干！)
+Don't talk anything, Just do it!
 
 ### Using Kong.Net
 
